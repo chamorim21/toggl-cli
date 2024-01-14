@@ -8,23 +8,23 @@ It's an application that allow users to handle their Toggl actions through simpl
 
 To validate the idea, it must be possible:
 
-1- Start a task
-2- Pause a task
-3- Resume a task
-4- List current status (if there is a task running/paused)
+- Start a task
+- Pause a task
+- Resume a task
+- List current status (if there is a task running/paused)
 
 ### Further functional requirements
 
-1- Show my projects
-2- Pass project as flag to start task
-3- Generate reports and download them passing dates as flags
+- Show my projects
+- Pass project as flag to start task
+- Generate reports and download them passing dates as flags
 
 ### Nonfunctional requirements
 
-1- It must be written completely in Go.
-2- It must be possible to interact with application only through terminal.
-3- It must have short commands.
-4- It must have clear and short messages.
+- It must be written completely in Go.
+- It must be possible to interact with application only through terminal.
+- It must have short commands.
+- It must have clear and short messages.
 
 ### Useful links
 
