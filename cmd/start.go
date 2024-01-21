@@ -1,18 +1,16 @@
 /*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+Copyright © 2024 Cristiano Amorim cristianoretiro2003@gmail.com
 */
 package cmd
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"time"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/chamorim21/toggl-cli/internal"
+	internal "github.com/chamorim21/toggl-cli/internal"
+	trackers "github.com/chamorim21/toggl-cli/internal/trackers"
 )
 
 // startCmd represents the start command
@@ -35,60 +33,29 @@ to quickly create a Cobra application.`,
 			return
 		}
 		timeEntryDescription := args[0]
-		startTimeEntry(timeEntryDescription)
+		tracker := &trackers.Toggl{}
+		start(tracker, timeEntryDescription)
 	},
 }
 
-func startTimeEntry(description string) {
-	var t *internal.Toggl = &internal.Toggl{}
+func start(t internal.Tracker, description string) {
+	loading := true
+	go func() {
+		if loading {
+			color.Cyan("Starting tracking...")
+		}
+	}()
 	err := t.Setup()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	type body struct {
-		CreatedWith string   `json:"created_with"`
-		Description string   `json:"description"`
-		Tags        []string `json:"tags"`
-		Billable    bool     `json:"billable"`
-		Duration    int      `json:"duration"`
-		Start       string   `json:"start"`
-		Stop        *string  `json:"stop"`
-		WorkspaceId int      `json:"workspace_id"`
-	}
-	payload := body{
-		CreatedWith: "Toggl CLI",
-		Description: description,
-		Tags:        []string{},
-		Billable:    false,
-		Duration:    -1,
-		Start:       time.Now().Format(time.RFC3339),
-		Stop:        nil,
-		WorkspaceId: t.WorkspaceId,
-	}
-	m, err := json.Marshal(payload)
+	s, err := t.Start(description)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("%s\n", err)
 		return
 	}
-	url := fmt.Sprintf("https://api.track.toggl.com/api/v9/workspaces/%d/time_entries", t.WorkspaceId)
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(m))
-	if err != nil {
-		fmt.Println(err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	username := t.ApiToken
-	password := "api_token"
-	req.SetBasicAuth(username, password)
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(err)
-	}
-	var target interface{}
-	json.NewDecoder(resp.Body).Decode(&target)
-	fmt.Printf("Response: %s\n", target)
-	defer resp.Body.Close()
+	color.Green("%s", s)
 }
 
 func init() {
