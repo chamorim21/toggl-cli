@@ -30,3 +30,4 @@ To validate the idea, it must be possible:
 
 - https://cobra.dev/
 - https://developers.track.toggl.com/docs/
+- https://pkg.go.dev/github.com/fatih/color
