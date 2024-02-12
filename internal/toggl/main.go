@@ -18,7 +18,7 @@ type Toggl struct {
 	ProjectId   int
 }
 
-func (t *Toggl) Setup() error {
+func (t *Toggl) setup() error {
 	err := godotenv.Load(".env")
 	if err != nil {
 		return fmt.Errorf("error loading .env file")
@@ -35,7 +35,6 @@ func (t *Toggl) Setup() error {
 	if projectId == "" {
 		return fmt.Errorf("error: TOGGL_PROJECT_ID is not set")
 	}
-
 	t.ApiToken = togglApiToken
 	wId, err := strconv.Atoi(workspaceId)
 	if err != nil {
@@ -50,7 +49,28 @@ func (t *Toggl) Setup() error {
 	return nil
 }
 
-func (t *Toggl) Start(description string) (string, error) {
+func New() (*Toggl, error) {
+	t := &Toggl{}
+	err := t.setup()
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+func (t *Toggl) newRequest(url string, method string) *http.Request {
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	username := t.ApiToken
+	password := "api_token"
+	req.SetBasicAuth(username, password)
+	return req
+}
+
+func (t *Toggl) Start(description string) error {
 	start := time.Now().Format(time.RFC3339)
 	type body struct {
 		CreatedWith string   `json:"created_with"`
@@ -76,7 +96,7 @@ func (t *Toggl) Start(description string) (string, error) {
 	}
 	m, err := json.Marshal(payload)
 	if err != nil {
-		return "", fmt.Errorf("error: %s", err)
+		return err
 	}
 	url := fmt.Sprintf("https://api.track.toggl.com/api/v9/workspaces/%d/time_entries", t.WorkspaceId)
 	client := &http.Client{}
@@ -84,7 +104,7 @@ func (t *Toggl) Start(description string) (string, error) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	username := t.ApiToken
 	password := "api_token"
 	req.SetBasicAuth(username, password)
@@ -93,7 +113,7 @@ func (t *Toggl) Start(description string) (string, error) {
 		fmt.Println(err)
 	}
 	defer resp.Body.Close()
-	return fmt.Sprintf("Time entry started at %s: %s", start, description), nil
+	return nil
 }
 
 type TimeEntry struct {
@@ -116,57 +136,60 @@ type TimeEntry struct {
 	Wid             int        `json:"wid"`
 }
 
-func (t *Toggl) getCurrentEntry() (*TimeEntry, error) {
+func (t *Toggl) currentTimeEntryId() (int, error) {
 	url := "https://api.track.toggl.com/api/v9/me/time_entries/current"
 	client := &http.Client{}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error: %s", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	username := t.ApiToken
-	password := "api_token"
-	req.SetBasicAuth(username, password)
+	req := t.newRequest(url, http.MethodGet)
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error: %s", err)
+		return 0, err
 	}
 	var body TimeEntry
 	err = json.NewDecoder(resp.Body).Decode(&body)
 	if err != nil {
-		return nil, fmt.Errorf("error: %s", err)
+		return 0, err
 	}
 	defer resp.Body.Close()
-	return &body, nil
+	return body.Id, nil
 }
 
-func (t *Toggl) Stop() (string, error) {
-	t.Setup()
-	c, err := t.getCurrentEntry()
+func (t *Toggl) Stop() error {
+	eId, err := t.currentTimeEntryId()
 	if err != nil {
-		return "", fmt.Errorf("error: %s", err)
+		return err
 	}
-	if c.Id == 0 {
-		return "", fmt.Errorf("no time entry running, please start tracking")
+	if eId == 0 {
+		return fmt.Errorf("no time entry running, please start tracking")
 	}
-	url := fmt.Sprintf("https://api.track.toggl.com/api/v9/workspaces/%d/time_entries/%d/stop", t.WorkspaceId, c.Id)
+	url := fmt.Sprintf("https://api.track.toggl.com/api/v9/workspaces/%d/time_entries/%d/stop", t.WorkspaceId, eId)
+	req := t.newRequest(url, http.MethodPut)
 	client := &http.Client{}
-	req, err := http.NewRequest("PATCH", url, nil)
-	if err != nil {
-		return "", fmt.Errorf("error: %s", err)
-	}
-	username := t.ApiToken
-	password := "api_token"
-	req.SetBasicAuth(username, password)
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("error: %s", err)
+		return err
 	}
-	var s TimeEntry
-	err = json.NewDecoder(resp.Body).Decode(&s)
+	defer resp.Body.Close()
+	e := &TimeEntry{}
+	err = json.NewDecoder(resp.Body).Decode(e)
 	if err != nil {
-		return "", fmt.Errorf("error: %s", err)
+		return err
 	}
-	parsedTime := s.Stop.Local().Format(time.RFC3339)
-	return fmt.Sprintf("Time entry stopped at %s: %s", parsedTime, c.Description), nil
+	return nil
+}
+
+func (t *Toggl) LastTimeEntryDescription() (string, error) {
+	req := t.newRequest(http.MethodGet,
+		"https://api.track.toggl.com/api/v9/me/time_entries")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var e []TimeEntry
+	err = json.NewDecoder(resp.Body).Decode(&e)
+	if err != nil {
+		return "", err
+	}
+	return e[0].Description, nil
 }
