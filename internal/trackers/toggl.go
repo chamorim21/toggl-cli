@@ -15,6 +15,7 @@ import (
 type Toggl struct {
 	ApiToken    string
 	WorkspaceId int
+	ProjectId   int
 }
 
 func (t *Toggl) Setup() error {
@@ -30,12 +31,22 @@ func (t *Toggl) Setup() error {
 	if workspaceId == "" {
 		return fmt.Errorf("error: TOGGL_WORKSPACE_ID is not set")
 	}
+	projectId := os.Getenv("TOGGL_PROJECT_ID")
+	if projectId == "" {
+		return fmt.Errorf("error: TOGGL_PROJECT_ID is not set")
+	}
+
 	t.ApiToken = togglApiToken
 	wId, err := strconv.Atoi(workspaceId)
 	if err != nil {
 		return fmt.Errorf("error: TOGGL_WORKSPACE_ID is not a number")
 	}
 	t.WorkspaceId = wId
+	pId, err := strconv.Atoi(projectId)
+	if err != nil {
+		return fmt.Errorf("error: TOGGL_PROJECT_ID is not a number")
+	}
+	t.ProjectId = pId
 	return nil
 }
 
@@ -50,6 +61,7 @@ func (t *Toggl) Start(description string) (string, error) {
 		Start       string   `json:"start"`
 		Stop        *string  `json:"stop"`
 		WorkspaceId int      `json:"workspace_id"`
+		ProjectId   int      `json:"project_id"`
 	}
 	payload := body{
 		CreatedWith: "Toggl CLI",
@@ -60,6 +72,7 @@ func (t *Toggl) Start(description string) (string, error) {
 		Start:       start,
 		Stop:        nil,
 		WorkspaceId: t.WorkspaceId,
+		ProjectId:   t.ProjectId,
 	}
 	m, err := json.Marshal(payload)
 	if err != nil {
